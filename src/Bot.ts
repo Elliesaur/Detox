@@ -43,6 +43,8 @@ class Bot {
             contents.forEach(text => {
                 resultPromises.push(perspective.analyze({
                     comment: { text },
+                    languages: ['en'],
+                    doNotStore: true,
                     requestedAttributes: {TOXICITY: {}, PROFANITY: {}},
                 }));
             });
