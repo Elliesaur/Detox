@@ -1,5 +1,6 @@
 # Tox
-Toxicity and profanity filter for Discord
+Toxicity and profanity filter for Discord. This bot makes use of the [Perspective API](https://www.perspectiveapi.com/).
+Add exemptions to specific roles and channels and customise percentages per server to log, warn or delete messages.
 
 # Invite Link
 If you'd like to use the bot how it is, without customising it feel free to [click here to invite it to your server](https://discordapp.com/oauth2/authorize?client_id=693392652456034384&scope=bot&permissions=388096).
