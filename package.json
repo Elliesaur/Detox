@@ -5,6 +5,7 @@
   "main": "./dist/index.js",
   "dependencies": {
     "@types/node": "^13.9.5",
+    "discord-logs": "^1.7.5",
     "discord.js": "^12.1.1",
     "dotenv": "^8.2.0",
     "mongodb": "^3.5.5",
