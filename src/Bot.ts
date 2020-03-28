@@ -342,6 +342,20 @@ ${roleNames.join('\n').trim()}
             }
         });
 
+        client.on("guildCreate", guild => {
+            console.log(`New guild joined: ${guild.name} (id: ${guild.id}). This guild has ${guild.memberCount} members!`);
+            
+            // Start by getting or creating the guild.
+            ConfigDatabase.getOrAddGuild(guild).then(guildConfig => {
+                if (guildConfig.logChannelId === '') {
+                    // New or unset channel.
+                    console.log(`Guild has not been configured with a channel yet.`);
+                }
+            });
+
+            client.user.setActivity(`Serving ${client.guilds.cache.size} servers`);
+        });
+
         client.on('ready', () => {
             console.log(`Bot has started, with ${client.users.cache.size} users in cache, in ${client.channels.cache.size} cached channels of ${client.guilds.cache.size} cached guilds.`); 
             client.user.setActivity(`Serving ${client.guilds.cache.size} servers`);
