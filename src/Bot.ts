@@ -9,7 +9,7 @@ import { ConfigDatabase } from './ConfigDatabase';
 
 const perspective = new Perspective({apiKey: process.env.PERSPECTIVE_API_KEY});
 const client = new Client({ partials: Object.values(Constants.PartialTypes)  });
-const commands = ['exemptchannels', 'setlogchannel', 'addexemptchannels', 'removeexemptchannels', 
+const commands = ['exemptchannels', 'settoxchannel', 'addexemptchannels', 'removeexemptchannels', 
                     'exemptroles', 'addexemptroles', 'removeexemptroles', 'configsummary',
                     'setdeletepercentage', 'setwarnpercentage', 'setlogpercentage', 'setprofanitycheck',
                     'settoxicitycheck', 'setdeletemessage', 'setdmuser'];
@@ -141,7 +141,7 @@ class Bot {
                 const args = message.content.slice(1).trim().split(/ +/g);
                 const command = args.shift().toLowerCase();
 
-                if (command === 'setlogchannel') {
+                if (command === 'settoxchannel') {
                     if (!message.member.hasPermission("ADMINISTRATOR")) {
                         return;
                     }
