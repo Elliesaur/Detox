@@ -41,15 +41,14 @@ class Bot {
             const contents = this.chunkString(message.cleanContent, 2047);
 
             // Get scores for each.
-            let resultPromises = [];
-            contents.forEach(text => {
-                resultPromises.push(perspective.analyze({
+            const resultPromises = contents.map(text => 
+                perspective.analyze({
                     comment: { text },
                     languages: ['en'],
                     doNotStore: true,
                     requestedAttributes: {TOXICITY: {}, PROFANITY: {}},
-                }));
-            });
+                })
+            );
 
             Promise.all(resultPromises).then(async results => {
                 let resultScores = [];
