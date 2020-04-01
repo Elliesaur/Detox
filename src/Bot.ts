@@ -13,7 +13,7 @@ const client = new Client({ partials: Object.values(Constants.PartialTypes)  });
 const commands = ['exemptchannels', 'settoxchannel', 'addexemptchannels', 'removeexemptchannels', 
                     'exemptroles', 'addexemptroles', 'removeexemptroles', 'configsummary',
                     'setdeletepercentage', 'setwarnpercentage', 'setlogpercentage', 'setprofanitycheck',
-                    'settoxicitycheck', 'setdeletemessage', 'setdmuser'];
+                    'settoxicitycheck', 'setdeletemessage', 'setdmuser', 'addblacklist', 'removeblacklist', 'blacklist'];
 logs(client);
 
 class Bot {
@@ -26,6 +26,10 @@ class Bot {
         this.handleCommands = this.handleCommands.bind(this);
     }
     public async checkProfanity(message: Message) {
+        if (message.cleanContent === '') {
+            return;
+        }
+
         ConfigDatabase.getOrAddGuild(message.guild).then(async guildConfig => {
             // Check if the channel is exempt
             if (guildConfig.exemptChannels.find(id => id == message.channel.id)) {
@@ -35,6 +39,21 @@ class Bot {
             // Check if the user is exempt
             if (message.member.roles.cache.filter(x => guildConfig.exemptRoles.includes(x.id)).size > 0) {
                 return;
+            }
+
+            // When dealing with the blacklist, we do not alert the user they have triggered a blacklist.
+            if (guildConfig.blacklistRegex.length > 0) {
+                try {
+                    for (const reg of guildConfig.blacklistRegex) {
+                        if (message.cleanContent.match(reg)) {
+                            // Delete message with a nice reason for auditing.
+                            await message.delete({ reason: 'Blacklisted Word Found' });
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    console.error('Blacklist regex failed', e)
+                }
             }
 
             // Chunk by 2047.
@@ -370,6 +389,39 @@ ${channelNames.join('\n').trim()}
 ${roleNames.join('\n').trim()}
 \`\`\``;
                         message.reply(formatted);
+                    });
+                }
+
+
+                if (command === 'addblacklist' && args.length > 0) {
+                    let blacklistRegex = args.join(' ').replace(/`/g, '');
+                    ConfigDatabase.addBlacklistRegex(message.guild, [blacklistRegex]).then(x => {
+                        if (x.ok) {
+                            message.reply(`Successfully added the blacklisted word.`);
+                        }
+                        else {
+                            message.reply(`Failed to add the blacklisted word.`);
+                        }
+                    });
+                }
+                if (command === 'removeblacklist' && args.length > 0) {
+                    let blacklistRegex = args.join(' ').replace(/`/g, '');
+                    ConfigDatabase.removeBlacklistRegex(message.guild, [blacklistRegex]).then(x => {
+                        if (x.ok) {
+                            message.reply(`Successfully removed blacklisted word.`);
+                        }
+                        else {
+                            message.reply(`Failed to remove the blacklisted word.`);
+                        }
+                    });
+                }
+                if (command === 'blacklist') {
+                    ConfigDatabase.getBlacklistRegex(message.guild).then(blacklistRegexes => {
+                        let formattedRegexes = `Blacklisted Words/Regex: 
+\`\`\`
+${blacklistRegexes.join('\n').trim()}
+\`\`\``;
+                        message.reply(formattedRegexes);
                     });
                 }
             });

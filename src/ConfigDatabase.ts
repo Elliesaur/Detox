@@ -78,7 +78,8 @@ class InternalConfigDatabase {
                     deleteMessage: false,
                     logPercentage: '75',
                     profanityCheck: true,
-                    toxicityCheck: true
+                    toxicityCheck: true,
+                    blacklistRegexes: [],
                 }
             }, {
                 upsert: true,
@@ -311,9 +312,6 @@ class InternalConfigDatabase {
         }
     }
 
-
-
-
     public async getExemptRoles(guild: Guild): Promise<string[]> {
         return await this.getExemptRolesById(guild.id);
     }
@@ -381,6 +379,75 @@ class InternalConfigDatabase {
             return undefined;
         }
     }
+
+
+    public async getBlacklistRegex(guild: Guild): Promise<string[]> {
+        return await this.getBlacklistRegexById(guild.id);
+    }
+
+    public async getBlacklistRegexById(guildId: string): Promise<string[]> {
+        const collection = db.collection(collectionName);
+        try {
+            const results = (await collection.findOne({ id: guildId }))
+            if (results && results.blacklistRegex) {
+                return results.blacklistRegex;
+            } else {
+                this.getOrAddGuildById(guildId).then(guildConfig => {
+                    if (guildConfig) {
+                        console.log('Initialized guild', guildId);
+                    }
+                    return [];
+                })
+            }
+            return [];
+        } catch (e) {
+            console.error('getBlacklistRegexById', e);
+            return [];
+        }
+    }
+
+    public async addBlacklistRegex(guild: Guild, blacklistRegex: string[]) {
+        return await this.addBlacklistRegexById(guild.id, blacklistRegex);
+    }
+
+    public async addBlacklistRegexById(guildId: string, blacklistRegex: string[]) { 
+        const collection = db.collection(collectionName);
+        try {
+            const v = await collection.findOneAndUpdate({ id: guildId }, {
+                // Avoid dupes.
+                $addToSet: {
+                    blacklistRegex: {
+                        $each: blacklistRegex
+                    }
+                }
+            });
+            return v;
+        } catch (e) {
+            console.error('addBlacklistRegexById', e);
+            return undefined;
+        }
+    }
+
+    public async removeBlacklistRegex(guild: Guild, channels: string[]) {
+        return await this.removeBlacklistRegexById(guild.id, channels);
+    }
+
+    public async removeBlacklistRegexById(guildId: string, channels: string[]) {
+        const collection = db.collection(collectionName);
+        try {
+            const v = await collection.findOneAndUpdate({ id: guildId }, {
+                $pull: {
+                    blacklistRegex: {
+                        $in: channels
+                    }
+                }
+            });
+            return v;
+        } catch (e) {
+            console.error('removeBlacklistRegexById', e);
+            return undefined;
+        }
+    }
 }
 
 export interface GuildConfig { 
@@ -395,7 +462,7 @@ export interface GuildConfig {
     dmUser: boolean;
     exemptChannels: string[];
     exemptRoles: string[];
-
+    blacklistRegex: string[];
 }
 
 export const ConfigDatabase = new InternalConfigDatabase();
