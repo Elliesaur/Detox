@@ -92,6 +92,7 @@ class InternalConfigDatabase {
                     profanityCheck: true,
                     toxicityCheck: true,
                     blacklistRegexes: [],
+                    blacklistChannels: [],
                 }
             }, {
                 upsert: true,
