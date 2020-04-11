@@ -154,7 +154,10 @@ class Bot {
 
         ConfigDatabase.getOrAddGuild(message.guild).then(async guildConfig => {
             try {
-                await this.handleBlacklist(guildConfig, message);
+                // If the blacklist has triggered, ignore the profanity check.
+                if (await this.handleBlacklist(guildConfig, message)) {
+                    return;
+                }
                 await this.handleProfanity(guildConfig, message);
             } catch (e) {
                 console.error('performChecks', e);
