@@ -39,6 +39,18 @@ class InternalConfigDatabase {
         this.addExemptRolesById = this.addExemptRolesById.bind(this);
         this.removeExemptRoles = this.removeExemptRoles.bind(this);
         this.removeExemptRolesById = this.removeExemptRolesById.bind(this);
+        this.getBlacklistChannels = this.getBlacklistChannels.bind(this);
+        this.getBlacklistChannelsById = this.getBlacklistChannelsById.bind(this);
+        this.addBlacklistChannels = this.addBlacklistChannels.bind(this);
+        this.addBlacklistChannelsById = this.addBlacklistChannelsById.bind(this);
+        this.removeBlacklistChannels = this.removeBlacklistChannels.bind(this);
+        this.removeBlacklistChannelsById = this.removeBlacklistChannelsById.bind(this);
+        this.getBlacklistRegex = this.getBlacklistRegex.bind(this);
+        this.getBlacklistRegexById = this.getBlacklistRegexById.bind(this);
+        this.addBlacklistRegex = this.addBlacklistRegex.bind(this);
+        this.addBlacklistRegexById = this.addBlacklistRegexById.bind(this);
+        this.removeBlacklistRegex = this.removeBlacklistRegex.bind(this);
+        this.removeBlacklistRegexById = this.removeBlacklistRegexById.bind(this);
         MongoClient.connect(connectionUrl).then(a => {
             db = a.db(dbName);
         });
@@ -448,6 +460,74 @@ class InternalConfigDatabase {
             return undefined;
         }
     }
+
+    public async getBlacklistChannels(guild: Guild): Promise<string[]> {
+        return await this.getBlacklistChannelsById(guild.id);
+    }
+
+    public async getBlacklistChannelsById(guildId: string): Promise<string[]> {
+        const collection = db.collection(collectionName);
+        try {
+            const results = (await collection.findOne({ id: guildId }))
+            if (results && results.blacklistChannels) {
+                return results.blacklistChannels;
+            } else {
+                this.getOrAddGuildById(guildId).then(guildConfig => {
+                    if (guildConfig) {
+                        console.log('Initialized guild', guildId);
+                    }
+                    return [];
+                })
+            }
+            return [];
+        } catch (e) {
+            console.error('getBlacklistChannelsById', e);
+            return [];
+        }
+    }
+
+    public async addBlacklistChannels(guild: Guild, blacklistChannels: string[]) {
+        return await this.addBlacklistChannelsById(guild.id, blacklistChannels);
+    }
+
+    public async addBlacklistChannelsById(guildId: string, blacklistChannels: string[]) { 
+        const collection = db.collection(collectionName);
+        try {
+            const v = await collection.findOneAndUpdate({ id: guildId }, {
+                // Avoid dupes.
+                $addToSet: {
+                    blacklistChannels: {
+                        $each: blacklistChannels
+                    }
+                }
+            });
+            return v;
+        } catch (e) {
+            console.error('addBlacklistChannelsById', e);
+            return undefined;
+        }
+    }
+
+    public async removeBlacklistChannels(guild: Guild, channels: string[]) {
+        return await this.removeBlacklistChannelsById(guild.id, channels);
+    }
+
+    public async removeBlacklistChannelsById(guildId: string, channels: string[]) {
+        const collection = db.collection(collectionName);
+        try {
+            const v = await collection.findOneAndUpdate({ id: guildId }, {
+                $pull: {
+                    blacklistChannels: {
+                        $in: channels
+                    }
+                }
+            });
+            return v;
+        } catch (e) {
+            console.error('removeBlacklistChannelsById', e);
+            return undefined;
+        }
+    }
 }
 
 export interface GuildConfig { 
@@ -463,6 +543,7 @@ export interface GuildConfig {
     exemptChannels: string[];
     exemptRoles: string[];
     blacklistRegex: string[];
+    blacklistChannels: string[];
 }
 
 export const ConfigDatabase = new InternalConfigDatabase();

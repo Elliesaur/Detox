@@ -6,127 +6,159 @@ import {
     Constants,
 } from 'discord.js';
 import logs from 'discord-logs';
-import { ConfigDatabase } from './ConfigDatabase';
+import { ConfigDatabase, GuildConfig } from './ConfigDatabase';
 
 const perspective = new Perspective({apiKey: process.env.PERSPECTIVE_API_KEY});
 const client = new Client({ partials: Object.values(Constants.PartialTypes)  });
 const commands = ['exemptchannels', 'settoxchannel', 'addexemptchannels', 'removeexemptchannels', 
                     'exemptroles', 'addexemptroles', 'removeexemptroles', 'configsummary',
                     'setdeletepercentage', 'setwarnpercentage', 'setlogpercentage', 'setprofanitycheck',
-                    'settoxicitycheck', 'setdeletemessage', 'setdmuser', 'addblacklist', 'removeblacklist', 'blacklist'];
+                    'settoxicitycheck', 'setdeletemessage', 'setdmuser', 'addblacklist', 'removeblacklist', 'blacklist',
+                    'addblacklistchannels', 'removeblacklistchannels', 'blacklistchannels'];
 logs(client);
 
 class Bot {
 
     constructor() {
-        this.checkProfanity = this.checkProfanity.bind(this);
+        this.performChecks = this.performChecks.bind(this);
         this.chunkString = this.chunkString.bind(this);
         this.safe = this.safe.bind(this);
         this.start = this.start.bind(this);
         this.handleCommands = this.handleCommands.bind(this);
+        this.handleBlacklist = this.handleBlacklist.bind(this);
+        this.handleProfanity = this.handleProfanity.bind(this);
     }
-    public async checkProfanity(message: Message) {
+
+    private async handleProfanity(guildConfig: GuildConfig, message: Message) {
+        // Check if the channel is exempt
+        if (guildConfig.exemptChannels.find(id => id == message.channel.id)) {
+            return;
+        }
+        
+        // Check if the user is exempt
+        if (message.member.roles.cache.filter(x => guildConfig.exemptRoles.includes(x.id)).size > 0) {
+            return;
+        }
+
+        // Chunk by 2047.
+        const contents = this.chunkString(message.cleanContent, 2047);
+
+        // Get scores for each.
+        const resultPromises = contents.map(text => 
+            perspective.analyze({
+                comment: { text },
+                languages: ['en'],
+                doNotStore: true,
+                requestedAttributes: {TOXICITY: {}, PROFANITY: {}},
+            })
+        );
+
+        Promise.all(resultPromises).then(async results => {
+            let resultScores = [];
+
+            results.forEach(result => {
+                if (guildConfig.toxicityCheck) {
+                    resultScores.push(result.attributeScores.TOXICITY.summaryScore.value);
+                }
+                if (guildConfig.profanityCheck) {
+                    resultScores.push(result.attributeScores.PROFANITY.summaryScore.value);
+                }
+            });
+
+            // Calculate whether this is rude based on toxicity and profanity.
+            const percentage = resultScores.map(parseFloat).reduce((sum, current) => sum + current, 0) / (contents.length * 2) * 100;
+            const resultText = `Processed by Perspective Moderation with a score of ${percentage}%`;
+
+            if (percentage > parseFloat(guildConfig.logPercentage)) {
+                const logChannel = <TextChannel>message.guild.channels.cache.get(guildConfig.logChannelId);
+                if (!!logChannel) {
+                    await logChannel.send(`[LOGGED MESSAGE] <@${message.author.id}> (${message.author.tag}) - ${resultText} \`\`\`${this.safe(message.cleanContent).substring(0, 1024)}\`\`\``);
+                }
+            }
+
+            // Log % < Warn % < Delete %, check delete, then warn, ALWAYS log.
+            if (percentage > parseFloat(guildConfig.deletePercentage) && guildConfig.deleteMessage) {
+                try {
+                    const hasAttachment = message.attachments.size > 0;
+                    let attachmentUrl = '';
+                    if (hasAttachment) {
+                        attachmentUrl = message.attachments.first().proxyURL;
+                    }
+
+                    // Delete message with a nice reason for auditing.
+                    await message.delete({ reason: resultText });
+
+                    const logChannel = <TextChannel>message.guild.channels.cache.get(guildConfig.logChannelId);
+                    if (!!logChannel) {
+                        await logChannel.send(`[DELETED MESSAGE] <@${message.author.id}> (${message.author.tag}) - ${resultText} \`\`\`${this.safe(message.cleanContent).substring(0, 1024)}\`\`\` ${(hasAttachment ? ' with attachment ' + attachmentUrl : '')}`);
+                        
+                    }
+                    // Should we DM them telling them they've been rude?
+                    if (guildConfig.dmUser) {
+                        const dmChannel = await message.member.createDM();
+                        if (!!dmChannel) {
+                            await dmChannel.send(`Your message sent in '${message.guild.name}' was removed due to excessive toxicity or profanity. Please be respecful in the future and think before you send messages.`);
+                        }
+                    }
+                } catch (e) { 
+                    console.log('Failed when processing positive message', e);
+                }
+            } else if (percentage > parseFloat(guildConfig.warnPercentage)) {
+                await message.reply(`Please think before you send messages like that again.`);
+                return;
+            } 
+            
+        });
+    }
+
+    private async handleBlacklist(guildConfig: GuildConfig, message: Message): Promise<boolean> {
+
+        // Check whether we are to check blacklist for the message's channel.
+        if (!guildConfig.blacklistChannels.find(id => id == message.channel.id)) {
+            return;
+        }
+
+        // Check if the channel is exempt
+        if (guildConfig.exemptChannels.find(id => id == message.channel.id)) {
+            return;
+        }
+        
+        // Check if the user is exempt
+        if (message.member.roles.cache.filter(x => guildConfig.exemptRoles.includes(x.id)).size > 0) {
+            return;
+        }
+
+        // When dealing with the blacklist, we do not alert the user they have triggered a blacklist.
+        if (guildConfig.blacklistRegex.length > 0) {
+            try {
+                for (const reg of guildConfig.blacklistRegex) {
+                    const regexObj = new RegExp(reg, 'gi');
+
+                    if (regexObj.test(message.cleanContent)) {
+                        // Delete message with a nice reason for auditing.
+                        await message.delete({ reason: 'Blacklisted Word Found' });
+                        return true;
+                    }
+                }
+            } catch (e) {
+                console.error('Blacklist regex failed', e)
+            }
+        }
+        return false;
+    }
+
+    private async performChecks(message: Message) {
         if (message.cleanContent === '') {
             return;
         }
 
         ConfigDatabase.getOrAddGuild(message.guild).then(async guildConfig => {
-            // Check if the channel is exempt
-            if (guildConfig.exemptChannels.find(id => id == message.channel.id)) {
-                return;
+            try {
+                await this.handleBlacklist(guildConfig, message);
+                await this.handleProfanity(guildConfig, message);
+            } catch (e) {
+                console.error('performChecks', e);
             }
-            
-            // Check if the user is exempt
-            if (message.member.roles.cache.filter(x => guildConfig.exemptRoles.includes(x.id)).size > 0) {
-                return;
-            }
-
-            // When dealing with the blacklist, we do not alert the user they have triggered a blacklist.
-            if (guildConfig.blacklistRegex.length > 0) {
-                try {
-                    for (const reg of guildConfig.blacklistRegex) {
-                        if (message.cleanContent.match(reg)) {
-                            // Delete message with a nice reason for auditing.
-                            await message.delete({ reason: 'Blacklisted Word Found' });
-                            return;
-                        }
-                    }
-                } catch (e) {
-                    console.error('Blacklist regex failed', e)
-                }
-            }
-
-            // Chunk by 2047.
-            const contents = this.chunkString(message.cleanContent, 2047);
-
-            // Get scores for each.
-            const resultPromises = contents.map(text => 
-                perspective.analyze({
-                    comment: { text },
-                    languages: ['en'],
-                    doNotStore: true,
-                    requestedAttributes: {TOXICITY: {}, PROFANITY: {}},
-                })
-            );
-
-            Promise.all(resultPromises).then(async results => {
-                let resultScores = [];
-
-                results.forEach(result => {
-                    if (guildConfig.toxicityCheck) {
-                        resultScores.push(result.attributeScores.TOXICITY.summaryScore.value);
-                    }
-                    if (guildConfig.profanityCheck) {
-                        resultScores.push(result.attributeScores.PROFANITY.summaryScore.value);
-                    }
-                });
-
-                // Calculate whether this is rude based on toxicity and profanity.
-                const percentage = resultScores.map(parseFloat).reduce((sum, current) => sum + current, 0) / (contents.length * 2) * 100;
-                const resultText = `Processed by Perspective Moderation with a score of ${percentage}%`;
-
-                if (percentage > parseFloat(guildConfig.logPercentage)) {
-                    const logChannel = <TextChannel>message.guild.channels.cache.get(guildConfig.logChannelId);
-                    if (!!logChannel) {
-                        await logChannel.send(`[LOGGED MESSAGE] <@${message.author.id}> (${message.author.tag}) - ${resultText} \`\`\`${this.safe(message.cleanContent).substring(0, 1024)}\`\`\``);
-                    }
-                }
-
-                // Log % < Warn % < Delete %, check delete, then warn, ALWAYS log.
-                if (percentage > parseFloat(guildConfig.deletePercentage) && guildConfig.deleteMessage) {
-                    try {
-                        const hasAttachment = message.attachments.size > 0;
-                        let attachmentUrl = '';
-                        if (hasAttachment) {
-                            attachmentUrl = message.attachments.first().proxyURL;
-                        }
-
-                        // Delete message with a nice reason for auditing.
-                        await message.delete({ reason: resultText });
-
-                        const logChannel = <TextChannel>message.guild.channels.cache.get(guildConfig.logChannelId);
-                        if (!!logChannel) {
-                            await logChannel.send(`[DELETED MESSAGE] <@${message.author.id}> (${message.author.tag}) - ${resultText} \`\`\`${this.safe(message.cleanContent).substring(0, 1024)}\`\`\` ${(hasAttachment ? ' with attachment ' + attachmentUrl : '')}`);
-                            
-                        }
-                        // Should we DM them telling them they've been rude?
-                        if (guildConfig.dmUser) {
-                            const dmChannel = await message.member.createDM();
-                            if (!!dmChannel) {
-                                await dmChannel.send(`Your message sent in '${message.guild.name}' was removed due to excessive toxicity or profanity. Please be respecful in the future and think before you send messages.`);
-                            }
-                        }
-                    } catch (e) { 
-                        console.log('Failed when processing positive message', e);
-                    }
-                } else if (percentage > parseFloat(guildConfig.warnPercentage)) {
-                    await message.reply(`Please think before you send messages like that again.`);
-                    return;
-                } 
-                
-            });
-
-          
         });
     }
 
@@ -206,7 +238,7 @@ class Bot {
             }
             else if (!commands.includes(command)) {
                 // Process profanity check
-                await this.checkProfanity(message);
+                await this.performChecks(message);
                 return;
             }
             // Only allow commands to be executed in the log channel.
@@ -424,10 +456,53 @@ ${blacklistRegexes.join('\n').trim()}
                         message.reply(formattedRegexes);
                     });
                 }
+
+                if (command === 'addblacklistchannels') {
+                    const channelMentions = message.mentions.channels;
+                    if (channelMentions.size > 0) {
+                        const channelIds = channelMentions.map(channel => channel.id);
+                        ConfigDatabase.addBlacklistChannels(message.guild, channelIds).then(x => {
+                            if (x.ok) {
+                                message.reply(`Successfully added ${channelIds.length} channel(s) to be blacklist checked.`);
+                            }
+                            else {
+                                message.reply(`Failed to add the channels.`);
+                            }
+                        });
+                    }
+                }
+                if (command === 'removeblacklistchannels') {
+                    const channelMentions = message.mentions.channels;
+                    if (channelMentions.size > 0) {
+                        const channelIds = channelMentions.map(channel => channel.id);
+                        ConfigDatabase.removeBlacklistChannels(message.guild, channelIds).then(x => {
+                            if (x.ok) {
+                                message.reply(`Successfully removed ${channelIds.length} channel(s) from being blacklist checked.`);
+                            }
+                            else {
+                                message.reply(`Failed to remove the channels.`);
+                            }
+                        });
+                    }
+                }
+                if (command === 'blacklistchannels') {
+                    ConfigDatabase.getBlacklistChannels(message.guild).then(channelIds => {
+                        const channelNames = channelIds.map(id => {
+                            const channel = message.guild.channels.cache.find(c => c.id == id);
+                            const channelName = !!channel ? `${channel.name} - ID: ${id}` : `Unknown Channel - ID: ${id}`;
+                            return channelName;
+                        });
+                        let formattedChannels = `Blacklist Check Channels: 
+\`\`\`
+${channelNames.join('\n').trim()}
+\`\`\``;
+                        message.reply(formattedChannels);
+                    });
+                }
             });
         }
         else {
-            await this.checkProfanity(message);
+            await this.performChecks(message);
         }
     }
 }
