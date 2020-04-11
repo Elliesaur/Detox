@@ -114,7 +114,7 @@ class Bot {
     private async handleBlacklist(guildConfig: GuildConfig, message: Message): Promise<boolean> {
 
         // Check whether we are to check blacklist for the message's channel.
-        if (!guildConfig.blacklistChannels.find(id => id == message.channel.id)) {
+        if (guildConfig.blacklistChannels && !guildConfig.blacklistChannels.find(id => id == message.channel.id)) {
             return;
         }
 
