@@ -13,6 +13,8 @@ class InternalConfigDatabase {
         this.getOrAddGuildById = this.getOrAddGuildById.bind(this);
         this.getGuild = this.getGuild.bind(this);
         this.getGuildById = this.getGuildById.bind(this);
+        this.removeGuild = this.removeGuild.bind(this);
+        this.removeGuildById = this.removeGuildById.bind(this);
         this.updateDeletePercentage = this.updateDeletePercentage.bind(this);
         this.updateDeletePercentageById = this.updateDeletePercentageById.bind(this);
         this.updateWarnPercentage = this.updateWarnPercentage.bind(this);
@@ -101,6 +103,20 @@ class InternalConfigDatabase {
             return v.value;
         } catch (e) {
             console.error('addGuildById', e);
+            return undefined;
+        }
+    }
+
+    public async removeGuild(guild: Guild) {
+        return await this.removeGuildById(guild.id);
+    }
+
+    public async removeGuildById(guildId: string) {
+        const collection = db.collection(collectionName);
+        try {
+            return await collection.findOneAndDelete({ id: guildId });
+        } catch (e) {
+            console.error('removeGuildById', e);
             return undefined;
         }
     }

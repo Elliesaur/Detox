@@ -23,7 +23,7 @@ Note that the bot will not be able to function entirely if you do remove them.
 When the bot joins a server you'll need to set the log channel before anything can happen.
 All commands are case insensitive. Arguments to them are not.
 
-All commands excluding !SetToxChannel **must** be executed from the log channel.
+All commands excluding !SetToxChannel and !RemoveTox **must** be executed from the log channel.
 
 
 # Blacklist System
@@ -32,7 +32,7 @@ First the blacklist is checked then profanity is checked.
 
 If a regular expression has a match on the message then the message is deleted and no warning or log is sent to the tox channel or user. 
 
-The profanity filter is run against the message after the blacklist check is complete.
+The profanity filter is not run against the message if a match from the blacklist checker is found.
 
 It is important to note that exempt channels and exempt roles are still considered by the blacklist checker so if someone has a role that is exempt they are also exempt from triggering the blacklist checker.
 
@@ -53,6 +53,18 @@ Use by mentioning a channel.
 User> !settoxchannel \#event_log
 
 Bot> Set the log channel to 123456789
+
+---
+
+### !RemoveTox
+#### Description
+Removes all data related to the current server Detox is in.
+Detox will then attempt to leave the server by itself.
+Only an ADMINISTRATOR can execute this command. It may be executed from any channel.
+#### Arguments
+- none
+#### Example
+User> !removetox
 
 ---
 
