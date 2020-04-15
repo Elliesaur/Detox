@@ -1,8 +1,9 @@
-# Tox
+# Detox
 Toxicity and profanity filter for Discord. This bot makes use of the [Perspective API](https://www.perspectiveapi.com/).
 Add exemptions to specific roles and channels and customise percentages per server to log, warn or delete messages.
+Detox also supports a blacklist system implemented with Regular Expressions.
 
-This bot was made in 3 hours and should be considered unstable for production use. As the days go past I will attempt to improve it.
+This bot was made in a rush and should be considered unstable for production use. As the days go past I will attempt to improve it.
 
 # Invite Link
 If you'd like to use the bot how it is, without customising it feel free to [click here to invite it to your server](https://discordapp.com/oauth2/authorize?client_id=693392652456034384&scope=bot&permissions=388096).
@@ -23,6 +24,19 @@ When the bot joins a server you'll need to set the log channel before anything c
 All commands are case insensitive. Arguments to them are not.
 
 All commands excluding !SetToxChannel **must** be executed from the log channel.
+
+
+# Blacklist System
+Detox also features a blacklist system that uses regular expressions with the global and case-insensitive flags enabled. 
+First the blacklist is checked then profanity is checked. 
+
+If a regular expression has a match on the message then the message is deleted and no warning or log is sent to the tox channel or user. 
+
+The profanity filter is run against the message after the blacklist check is complete.
+
+It is important to note that exempt channels and exempt roles are still considered by the blacklist checker so if someone has a role that is exempt they are also exempt from triggering the blacklist checker.
+
+Blacklist channels are the list of channels that are monitored for blacklisted messages. By default a channel does not get checked against the blacklist.
 
 ---
 
@@ -198,3 +212,82 @@ Requires delete message to be triggered in order to send a DM.
 User> !setdmuser no
 
 Bot> Successfully set DM user to false
+
+---
+
+### !Blacklist
+#### Description
+Displays the blacklist.
+#### Arguments
+- none
+#### Example
+User> !blacklist
+
+Bot> Blacklisted Words/Regex: 
+```
+bad[\w\s]+word
+```
+
+---
+
+### !AddBlacklist
+#### Description
+Adds a regular expression (regex) to the blacklist. Regular expressions have the G and I flags when tested against messages.
+#### Arguments
+- the regular expression
+#### Example
+User> !addblacklist bad[\w\s]+word
+
+Bot> Successfully added the blacklisted word.
+
+---
+
+### !RemoveBlacklist
+#### Description
+Removes a regular expression (regex) from the blacklist.
+#### Arguments
+- the regular expression
+#### Example
+User> !removeblacklist bad[\w\s]+word
+
+Bot> Successfully removed blacklisted word.
+
+---
+
+### !BlacklistChannels
+#### Description
+Displays blacklist-enabled channels. Channels in this list are monitored by the blacklist checker.
+#### Arguments
+- none
+#### Example
+User> !blacklistchannels
+
+Bot> Blacklist Check Channels: 
+```
+test123 - ID: 43525733337933
+test1234 - ID: 693717688633334
+```
+
+---
+
+### !AddBlacklistChannels
+#### Description
+Adds a list of channels to be monitored for blacklisted words/regexes.
+#### Arguments
+- Channel mentions.
+#### Example
+User> !addblacklistchannels #test123 #test345
+
+Bot> Successfully added 2 channel(s) to be blacklist checked.
+
+---
+
+### !RemoveBlacklistChannels
+#### Description
+Removes a list of channels from blacklist monitoring.
+#### Arguments
+- Channel mentions.
+#### Example
+User> !removeblacklistchannels #test123 #test345
+
+Bot> Successfully removed 2 channel(s) from being blacklist checked.
