@@ -153,6 +153,10 @@ class Bot {
         }
 
         ConfigDatabase.getOrAddGuild(message.guild).then(async guildConfig => {
+            // Do not check messages if config is not set up.
+            if (guildConfig.logChannelId === '') {
+                return;
+            }
             try {
                 // If the blacklist has triggered, ignore the profanity check.
                 if (await this.handleBlacklist(guildConfig, message)) {
