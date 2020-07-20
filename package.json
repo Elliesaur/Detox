@@ -4,11 +4,11 @@
   "description": "Discord bot for toxicity and profanity checking",
   "main": "./dist/index.js",
   "dependencies": {
-    "@types/node": "^13.9.5",
-    "discord-logs": "^1.7.5",
-    "discord.js": "^12.1.1",
+    "@types/node": "^13.13.14",
+    "discord-logs": "^1.7.6",
+    "discord.js": "^12.2.0",
     "dotenv": "^8.2.0",
-    "mongodb": "^3.5.5",
+    "mongodb": "^3.5.9",
     "perspective-api-client": "^3.1.0"
   },
   "devDependencies": {},
