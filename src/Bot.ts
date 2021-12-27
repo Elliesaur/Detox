@@ -130,19 +130,23 @@ class Bot {
 
         // When dealing with the blacklist, we do not alert the user they have triggered a blacklist.
         if (guildConfig.blacklistRegex.length > 0) {
-            try {
                 for (const reg of guildConfig.blacklistRegex) {
                     const regexObj = new RegExp(reg, 'gi');
+                    try {
 
                     if (regexObj.test(message.cleanContent)) {
                         // Delete message with a nice reason for auditing.
                         await message.delete({ reason: 'Blacklisted Word Found' });
                         return true;
                     }
+                    
                 }
-            } catch (e) {
-                console.error('Blacklist regex failed', e)
-            }
+                catch (e) {
+                    console.log('Failed when processing regex:', e);
+                    console.log('Skipping.') 
+                }
+                
+            } 
         }
         return false;
     }
