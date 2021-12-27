@@ -143,7 +143,7 @@ class Bot {
                 }
                 catch (e) {
                     console.log('Failed when processing regex:', e);
-                    console.log('Skipping.')
+                    console.log('Skipping.') 
                 }
                 
             } 
